@@ -1,0 +1,14 @@
+---
+host_ip_list:
+- {ip: "1.1.1.1", name: "dev-test-1"}
+- {ip: "2.2.2.2", name: "dev-test-2"}
+- {ip: "3.3.3.3", name: "dev-test-3"}
+
+group_members:
+- "dev-test-1"
+- "dev-test-2"
+- "dev-test-3"
+
+group_name: "group-LB-test"
+
+rule_name: "LB-test"

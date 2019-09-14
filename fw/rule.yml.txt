@@ -1,0 +1,59 @@
+---
+- name: add LB rule to FW
+  hosts: "localhost"
+  vars:
+    auth: "{{ lookup('file','auth.yml') | from_yaml }}"
+    conf: "{{ lookup('file','conf.yml') | from_yaml }}"
+
+  tasks:
+  - name: "login"
+    check_point_mgmt:
+      command: login
+      parameters:
+        username: "{{auth.username}}"
+        password: "{{auth.password}}"
+        managment: "{{auth.fw_ip}}"
+      fingerprint: "{{auth.fingerprint}}"
+    register: login_response
+
+  -name: "add host"
+    check_point_mgmt:
+      command: add-host
+      parameters:
+        name: "{{item.name}}"
+        ip-address: "{{item.ip}}"
+      session-data: "{{ login_response }}"
+    with_items:
+    - "{{ conf.host_ip_list }}"
+
+  -name: "add group"
+    check_point_mgmt:
+      command: add-geoup
+      parameters:
+        name: "{{conf.group_name}}"
+        members: "{{conf.group_members}}"
+      session-data: "{{ login_response }}"
+
+  -name: "add-access-rule"
+    check_point_mgmt:
+      command: add-access-rule
+      parameters:
+        name: "{{conf.rule_name}}"
+        layer: "network"
+        action: "accept"
+        source: "LB-Group"
+        destination: "{{conf.group_name}}"
+        service: ["HTTP"]
+        track: {"type" : "log"}
+        position: {"bottom" : "LB"}
+      session-data: "{{ login_response }}"
+
+  -name: "publish"
+    check_point_mgmt:
+      command: publish
+      session-data: "{{ login_response }}"
+
+  -name: "logout"
+    check_point_mgmt:
+      command: logout
+      session-data: "{{ login_response }}"
