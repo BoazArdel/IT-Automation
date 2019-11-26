@@ -1,0 +1,118 @@
+import paramiko
+import telnetlib
+import time
+
+#############Boaz Ardel#############
+
+class TelnetSSH:
+	def __init__(self, host, User='admin', Pass='123456', breakChar='', type='ssh', maxtries=5):
+		self.connected = False
+		self.host = host
+		self.type = type
+		self.breakChar = breakChar
+
+		def SSH_connect(user, pass, maxtries):
+			self.ssh = paramiko.SSHClient()
+			paramiko.util.log_to_file("paramiko")
+			self.ssh.load_system_host_keys()
+			#self.ssh.load_host_keys(os.path.expanduser('~/.ssh/known_hosts'))
+			self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+			try:
+				self.ssh.connect(self.host, 22, username=user, password=pass, allow_agent=False, look_for_keys=False)
+			except paramiko.AuthenticationException, e:
+				print e.message , self.host
+				return False
+			self.channel = self.ssh.invoke_shell()
+
+			while not self.channel.recv_ready() and maxtries > 0:
+				time.sleep(0.1)
+				maxtries = maxtries - 1
+			if not maxtries >0:
+				raise Exception("SSH connection failed: Probably wrong Username/Password")
+			self.channel.recv(-1)	#flush
+			return True
+
+		def Telnet_connect(user, pass, maxtries):
+			#print self.host,user,pass,maxtries
+			self.t = telnetlib.Telnet(self.host, "23", timeout=3)
+			self.t.read_until("sername:", timeout=3)
+			self.t.write(user + '\r\n\')
+			self.t.read_until("assword:", timeout=3)	
+			self.t.write(pass + '\r\n\')
+			#print 'tekneted',self.host
+			if(self.breakChar != ''):
+				self.t.read_until(self.breakChar, timeout=3)
+			else:
+				time.sleep(3)
+				self.t.read_very_eager()
+			return True
+
+		if self.type == 'telnet':
+			if not Telnet_connect(user, pass, maxtries)
+				raise Exception('Connection failed!')
+			elif not SSH_connect(user,pass, maxtries):
+				self.type = 'telnet'
+				if not Telnet_connet(user, pass, maxtries):
+					raise Exception('connection failed!')
+
+			self.connected = True
+
+
+	def send_command(self, cmd='', maxtries=3):
+		if (self.connected):
+			if (self.type == 'ssh'):
+				#self.stdin = self.channel.makefile('w')
+				#self.stdout = self.channel.makefile('r')
+			try:
+				self.channel.send(cmd)
+				self.channel.send('\n')
+				#self.stdin.write(cmd)
+				#self.stdin.write('\n')
+			except: Exception, e:
+				return e.message
+			tries = 0
+			#time.sleep(1.3)
+			while not self.channel.recv_ready() and tries < maxtries:
+				tries = tries + 1
+				#time.sleep(0.3)
+			#self.channel.close()
+			out = self.channel.recv(-1)	#all
+			return out.decode("ascii")
+		elif (self.type == 'telnet'):
+			res = None
+			self.t.write(cmd)
+			self.t.write('\n')
+			try:
+				time.sleep(3)
+				if (self.breakChar == ''):
+					time.sleep(3)
+					Res = self.t.read_very_eager()
+				else:
+					Res = self.t.read_until(self.breakChar,timeout=2)
+			except Exception, e:
+				raise Exception('Unable to read telnet!\n' + e.message)
+			return Res
+		else:
+			raise Exception('Not Connected!')
+		
+	def close(self):
+		if (self.connected):
+			if (self.type == 'ssh'):
+				self.ssh.close()
+				return True
+			if (self.type == 'telnet'):
+				self.t.close()
+				return True
+		else:
+			raise Exception('Not connected!')
+
+	def __del__(self):
+		if (self.connected):
+			self.close()
+
+##################################################
+'''
+c=TelnetSSH('1.1.1.1','admin','123456')
+print c.send_command("show run")
+c.close()
+'''
